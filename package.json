@@ -55,28 +55,7 @@
     "./dist/pele.js",
     "./src/index.ts"
   ],
-  "scripts": {
-    "build": "node scripts/build.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run --exclude \"tests/website/**\"",
-    "test:website": "vitest run tests/website",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
-    "test:watch": "vitest --exclude \"tests/website/**\"",
-    "bench": "node scripts/bench.mjs",
-    "bench:mermaid": "node scripts/bench-mermaid.mjs",
-    "website": "cd website && pnpm dev"
-  },
   "engines": {
     "node": ">=20"
-  },
-  "devDependencies": {
-    "@braintree/sanitize-url": "^7.1.2",
-    "@mermaid-js/parser": "^2.0.1",
-    "beautiful-mermaid": "^1.1.3",
-    "esbuild": "^0.28.2",
-    "jison": "^0.4.18",
-    "js-yaml": "^4.3.2",
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
   }
 }

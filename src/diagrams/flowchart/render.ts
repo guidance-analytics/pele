@@ -1,4 +1,4 @@
-import { cnode, compoundLayout, direction, inheritCrossedDirections, shiftLayout, type CEdge, type CNode, type CompoundResult, type Dir } from '../../layout/compound.js';
+import { cnode, compoundLayout, direction, shiftLayout, type CEdge, type CNode, type CompoundResult, type Dir } from '../../layout/compound.js';
 import { titleLabel } from '../../svg/title.js';
 import type { LayeredOptions } from '../../layout/layered.js';
 import type { Config } from '../../preprocess.js';
@@ -55,6 +55,22 @@ interface NodeView {
   h: number;
   dy: number;
   loops: number;
+}
+
+const MAX_MARKER = 20;
+
+// A node whose styles pin both dimensions to a point-marker size is a junction: it is laid out
+// at that size rather than around its label.
+function markerSize(styles: string[]): { w: number; h: number } | undefined {
+  let w: number | undefined;
+  let h: number | undefined;
+  for (const decl of styles.flatMap((s) => s.split(/[;,]/))) {
+    const m = /^\s*(width|height)\s*:\s*([\d.]+)px\s*$/.exec(decl);
+    if (!m) continue;
+    if (m[1] === 'width') w = Number(m[2]);
+    else h = Number(m[2]);
+  }
+  return w !== undefined && h !== undefined && w <= MAX_MARKER && h <= MAX_MARKER ? { w, h } : undefined;
 }
 
 export function renderFlowchart(db: FlowDb, config: Config, options: RenderOptions, variant?: FlowVariant): Rendered {
@@ -121,8 +137,11 @@ function draw(db: FlowDb, config: Config, options: RenderOptions, variant: FlowV
         h = s.h;
         dy = s.dy;
       }
-      view = { node, style, label, shape, w, h, dy, loops: 0 };
-      c = cnode(w, h);
+      const marker = markerSize(node.cssCompiledStyles.concat(node.cssStyles));
+      view = marker
+        ? { node, style, label: layoutLabel(undefined, markdown, measurer, fontSize, wrapWidth, textStyle), shape, w: marker.w, h: marker.h, dy: 0, loops: 0 }
+        : { node, style, label, shape, w, h, dy, loops: 0 };
+      c = cnode(view.w, view.h);
     }
     c.seq = views.length;
     views.push(view);
@@ -131,7 +150,6 @@ function draw(db: FlowDb, config: Config, options: RenderOptions, variant: FlowV
   graph.nodes.forEach((node, i) => {
     cnodes[i].parent = node.parentId !== undefined ? (index.get(node.parentId) ?? -1) : -1;
   });
-  inheritCrossedDirections(cnodes, graph.edges.map((edge) => [index.get(edge.start) ?? -1, index.get(edge.end) ?? -1] as const));
 
   const rootDir = turned ? 'TB' : direction(db.direction);
   const flowsSideways = (i: number): boolean => {
@@ -181,6 +199,7 @@ function draw(db: FlowDb, config: Config, options: RenderOptions, variant: FlowV
     edgeSep: EDGE_SEP,
     rankSep: numberOption(flow, 'rankSpacing', RANK_SEP) * (tight ? 0.75 : 1),
     portSep: 20,
+    turnsInRow: true,
     tracks: typeof flow.curve === 'string' && /^step/.test(flow.curve),
     straight: flow.curve === 'linear',
     headRoom: markerTrim('arrow_point'),

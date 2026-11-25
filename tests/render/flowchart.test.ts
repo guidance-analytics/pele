@@ -315,19 +315,23 @@ describe('flowchart rendering', () => {
     expect(svg.indexOf('pele-clusters')).toBeLessThan(svg.indexOf('pele-nodes'));
   });
 
-  it("ignores a subgraph's direction when its nodes link outside it", () => {
-    const groups = 'flowchart LR\n  subgraph S\n    direction TB\n    s1\n    s2\n  end\n  subgraph P\n    direction TB\n    p1\n    p2\n  end\n';
-    const edges = '  s1 --> p2\n  s2 --> p1\n';
-    expect(render(groups + edges, options).svg).toBe(render(groups.replace(/ *direction TB\n/g, '') + edges, options).svg);
-
+  it("keeps a subgraph's direction when its nodes link outside it", () => {
     const { svg } = render(
-      'flowchart LR\n  subgraph one\n    direction TB\n    a1 --> a2\n  end\n  subgraph two\n    direction TB\n    b1 --> b2\n  end\n  subgraph outer\n    direction TB\n    subgraph inner\n      direction TB\n      c1 --> c2\n    end\n    c3\n  end\n  x --> one\n  x --> b1\n  c3 --> x',
+      'flowchart LR\n  subgraph S\n    direction TB\n    s1 --> s2\n  end\n  subgraph P\n    direction TB\n    p1 --> p2\n  end\n  x --> s1\n  s2 --> p1',
       options
     );
     const at = (id: string): number[] => svg.match(new RegExp(`data-id="${id}" transform="translate\\(([-\\d.]+),([-\\d.]+)`))!.slice(1).map(Number);
-    expect(at('a1')[0]).toBe(at('a2')[0]);
-    expect(at('b1')[1]).toBe(at('b2')[1]);
-    expect(at('c1')[0]).toBe(at('c2')[0]);
+    expect(at('s1')[0]).toBe(at('s2')[0]);
+    expect(at('s2')[1]).toBeGreaterThan(at('s1')[1]);
+    expect(at('p1')[0]).toBe(at('p2')[0]);
+    expect(at('p1')[0]).toBeGreaterThan(at('s1')[0]);
+  });
+
+  it('lays out a node styled to a point-marker size at that size', () => {
+    const { svg } = render('flowchart LR\n  classDef hidden width: 1px, height: 1px, opacity: 0;\n  a --> j:::hidden\n  j --> b\n  j --> c', options);
+    const plain = render('flowchart LR\n  a --> j\n  j --> b\n  j --> c', options).svg;
+    const width = (s: string): number => Number(/viewBox="[-\d.]+ [-\d.]+ ([\d.]+)/.exec(s)![1]);
+    expect(width(svg)).toBeLessThan(width(plain));
   });
 
   it('lines up unlinked subgraph members with the member an outside edge enters', () => {

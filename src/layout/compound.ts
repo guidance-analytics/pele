@@ -680,8 +680,15 @@ export function compoundLayout(nodes: CNode[], edges: CEdge[], rootDir: Dir, opt
 
   // Reuse unchanged levels across layout attempts.
   const laid = new Map<number, { given: number[]; lnodes: LNode[]; ledges: LEdge[]; size: LayeredResult }[]>();
+  // A level holding a group that flows another way, with an edge passing into it, keeps its
+  // ranks in a row: straightening those edges would walk each group across the flow.
+  const crossesTurn = (level: Level): boolean =>
+    level.edges.some(({ e, a, b }) =>
+      [[a, true], [b, false]].some(([item, out]) =>
+        nodes[item as number].isGroup && levelOf.get(item as number)!.dir !== level.dir && endpointBelow(item as number, edges[e], out as boolean)));
   const layOut = (level: Level, lnodes: LNode[], ledges: LEdge[]): { lnodes: LNode[]; ledges: LEdge[]; size: LayeredResult } => {
-    if (!ordered) return { lnodes, ledges, size: layered(lnodes, ledges, opt) };
+    const lopt = opt.turnsInRow && crossesTurn(level) ? { ...opt, simple: true } : opt;
+    if (!ordered) return { lnodes, ledges, size: layered(lnodes, ledges, lopt) };
     const given: number[] = [];
     for (const ln of lnodes) given.push(ln.w, ln.h, ln.kind, ln.pin, ln.hint, ln.key, ln.span);
     for (const le of ledges) given.push(le.tail, le.head, le.minlen, le.labelW, le.labelH, le.tailDx, le.headDx, +le.tailFixed, +le.headFixed);
@@ -692,7 +699,7 @@ export function compoundLayout(nodes: CNode[], edges: CEdge[], rootDir: Dir, opt
       for (let i = 0; same && i < given.length; i++) same = Object.is(p.given[i], given[i]);
       if (same) return p;
     }
-    const done = { given, lnodes, ledges, size: layered(lnodes, ledges, opt) };
+    const done = { given, lnodes, ledges, size: layered(lnodes, ledges, lopt) };
     past.push(done);
     return done;
   };

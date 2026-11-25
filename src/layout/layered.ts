@@ -88,6 +88,11 @@ export interface LayeredOptions {
   groups?: { of: Int32Array; parent: Int32Array };
   // Compute cross-flow positions in `x` without full routing.
   orderOnly?: boolean;
+  // Center every rank on one line instead of aligning nodes to straighten edges.
+  simple?: boolean;
+  // For compound layouts: a level where an edge passes into a group that flows another way is
+  // laid out with `simple`.
+  turnsInRow?: boolean;
 }
 
 export interface LayeredResult {
@@ -2028,8 +2033,25 @@ function halfRoom(g: Graph, opt: LayeredOptions, v: number): number {
   return g.W[v] / 2 + (g.KIND[v] === Kind.Node ? opt.nodeSep : opt.edgeSep) / 2;
 }
 
+function centeredRanks(g: Graph, opt: LayeredOptions): Float64Array {
+  const { n, maxRank, layerStart, order } = g;
+  const xs = new Float64Array(n);
+  for (let r = 0; r <= maxRank; r++) {
+    let total = 0;
+    for (let i = layerStart[r]; i < layerStart[r + 1]; i++) total += 2 * halfRoom(g, opt, order[i]);
+    let x = -total / 2;
+    for (let i = layerStart[r]; i < layerStart[r + 1]; i++) {
+      const half = halfRoom(g, opt, order[i]);
+      xs[order[i]] = x + half;
+      x += 2 * half;
+    }
+  }
+  return xs;
+}
+
 // Brandes-Köpf horizontal coordinate assignment: four aligned layouts, balanced.
 function position(g: Graph, opt: LayeredOptions): Float64Array {
+  if (opt.simple) return centeredRanks(g, opt);
   const { n, maxRank, W, KIND, EF, ET, EFD, ETD, succStart, succE, predStart, predE, layerStart, order, pos } = g;
   const segments = EF.length;
   const gap = new Float64Array(n);
